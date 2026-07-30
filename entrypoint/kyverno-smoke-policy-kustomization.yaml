@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kyverno-smoke-policy
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: kyverno-smoke-policy
+    app.kubernetes.io/part-of: kubecrate-kind-smoke
+    kubecrate.io/workload-category: platform-services
+spec:
+  dependsOn:
+    - name: kyverno
+  interval: 1m0s
+  path: ./platform-services/kyverno/policy
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: kind-smoke
+  timeout: 5m0s
+  wait: true
+  healthChecks:
+    - apiVersion: kyverno.io/v1
+      kind: ClusterPolicy
+      name: require-ns-label

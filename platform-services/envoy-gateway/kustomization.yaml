@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./smoke-envoyproxy.yaml
+  - ./smoke-gatewayclass.yaml
+  - ./smoke-gateway.yaml
+  - ./smoke-httproute.yaml
+  - ./smoke-referencegrant.yaml

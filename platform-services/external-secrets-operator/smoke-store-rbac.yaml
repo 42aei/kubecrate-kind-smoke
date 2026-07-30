@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eso-smoke-store-reader
+  namespace: kubecrate-system
+  labels:
+    app.kubernetes.io/name: eso-smoke-store-reader
+    app.kubernetes.io/part-of: kubecrate
+    kubecrate.io/workload-category: platform-services
+    kubecrate.io/smoke-test: external-secrets-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eso-smoke-source-reader
+  namespace: kubecrate-system
+  labels:
+    app.kubernetes.io/name: eso-smoke-source-reader
+    app.kubernetes.io/part-of: kubecrate
+    kubecrate.io/workload-category: platform-services
+    kubecrate.io/smoke-test: external-secrets-operator
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["eso-smoke-source"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eso-smoke-source-reader
+  namespace: kubecrate-system
+  labels:
+    app.kubernetes.io/name: eso-smoke-source-reader
+    app.kubernetes.io/part-of: kubecrate
+    kubecrate.io/workload-category: platform-services
+    kubecrate.io/smoke-test: external-secrets-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eso-smoke-source-reader
+subjects:
+  - kind: ServiceAccount
+    name: eso-smoke-store-reader
+    namespace: kubecrate-system

@@ -1,0 +1,27 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ns-label
+  labels:
+    app.kubernetes.io/name: kyverno-smoke-require-ns-label
+    app.kubernetes.io/part-of: kubecrate
+    kubecrate.io/workload-category: platform-services
+    kubecrate.io/smoke-test: kyverno
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-validated-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                - "kyverno-smoke-*"
+      validate:
+        message: Namespace requires kubecrate.io/validated=true
+        pattern:
+          metadata:
+            labels:
+              kubecrate.io/validated: "true"
