@@ -1,0 +1,1 @@
+# kubecrate-kind-smoke
