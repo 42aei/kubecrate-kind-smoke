@@ -18,6 +18,9 @@ EXPECTED = {
     "kyverno-smoke-policy": "./platform-services/kyverno/policy",
     "kyverno-smoke": "./platform-services/kyverno/consumer",
 }
+GATEWAY = ROOT / "platform-services/envoy-gateway/smoke-gateway.yaml"
+ROUTE = ROOT / "platform-services/envoy-gateway/smoke-httproute.yaml"
+REFERENCE_GRANT = ROOT / "platform-services/envoy-gateway/smoke-referencegrant.yaml"
 
 def load(path: Path):
     with path.open(encoding="utf-8") as fh:
@@ -38,6 +41,17 @@ def main() -> int:
         assert doc["spec"]["sourceRef"] == {"kind": "GitRepository", "name": "kind-smoke"}
     assert load(ENTRYPOINT / "kyverno-smoke-policy-kustomization.yaml")["metadata"]["labels"]["kubecrate.io/workload-category"] == "platform-services"
     assert load(ENTRYPOINT / "kyverno-smoke-kustomization.yaml")["metadata"]["labels"]["kubecrate.io/workload-category"] == "application-services"
+    gateway = load(GATEWAY)
+    https = next(listener for listener in gateway["spec"]["listeners"] if listener["name"] == "https")
+    assert https["protocol"] == "HTTPS" and https["port"] == 443
+    assert https["tls"]["certificateRefs"] == [{
+        "group": "", "kind": "Secret", "name": "cratecheck-tls", "namespace": "cratecheck"
+    }]
+    route = load(ROUTE)
+    assert {parent["sectionName"] for parent in route["spec"]["parentRefs"]} == {"http", "https"}
+    grant = load(REFERENCE_GRANT)
+    assert grant["metadata"]["namespace"] == "cratecheck"
+    assert grant["spec"]["to"] == [{"group": "", "kind": "Secret", "name": "cratecheck-tls"}]
     for root in ROOTS:
         result = subprocess.run(["kustomize", "build", str(root)], cwd=ROOT, text=True, capture_output=True)
         assert result.returncode == 0, f"kustomize build {root.relative_to(ROOT)} failed: {result.stderr}"
