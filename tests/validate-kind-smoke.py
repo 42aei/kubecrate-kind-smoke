@@ -8,6 +8,8 @@ Static, red-capable checks for the consumer-side smoke suite:
   contract the CrateCheck check config evaluates
 - CrateCheck check IDs stay in lockstep with scripts/validate-cratecheck-status.py
 - every fixture root renders with kustomize
+- every namespace referenced by rendered fixture objects is either created by a
+  smoke fixture Namespace object or provided by the kubecrate substrate
 """
 
 from pathlib import Path
@@ -55,6 +57,17 @@ CRATECHECK_CONFIGMAP = ROOT / "application-services/cratecheck/configmap.yaml"
 CRATECHECK_RBAC = ROOT / "application-services/cratecheck/clusterrole.yaml"
 STATUS_VALIDATOR = ROOT / "scripts/validate-cratecheck-status.py"
 DENIAL_MESSAGE = "Namespace requires kubecrate.io/validated=true"
+# Namespaces the pinned kubecrate substrate (or Kubernetes itself) provides;
+# every other referenced namespace must be created by a smoke fixture.
+KUBECRATE_NAMESPACES = {
+    "core-external-secrets-operator",
+    "core-envoy-gateway",
+    "core-cert-manager",
+    "core-kyverno",
+    "flux-system",
+    "default",
+    "kube-system",
+}
 
 
 def load(path: Path):
@@ -174,6 +187,33 @@ def assert_roots_render() -> None:
         assert result.returncode == 0, f"kustomize build {root.relative_to(ROOT)} failed: {result.stderr}"
 
 
+def render(root: Path) -> list:
+    result = subprocess.run(
+        ["kustomize", "build", str(root)], cwd=ROOT, text=True, capture_output=True
+    )
+    assert result.returncode == 0, f"kustomize build {root.relative_to(ROOT)} failed: {result.stderr}"
+    return [doc for doc in yaml.safe_load_all(result.stdout) if isinstance(doc, dict)]
+
+
+def assert_namespace_coherence() -> None:
+    fixture_roots = [root for root in ROOTS if root != ENTRYPOINT]
+    created = set()
+    referenced = set()
+    for root in fixture_roots:
+        for doc in render(root):
+            metadata = doc.get("metadata") or {}
+            if doc.get("kind") == "Namespace":
+                created.add(metadata.get("name"))
+            namespace = metadata.get("namespace")
+            if namespace:
+                referenced.add(namespace)
+    missing = referenced - created - KUBECRATE_NAMESPACES
+    assert not missing, (
+        f"fixture objects reference namespaces that no smoke fixture creates and the "
+        f"kubecrate substrate does not provide: {sorted(missing)}"
+    )
+
+
 def main() -> int:
     assert_entrypoint_contract()
     assert_envoy_tls_contract()
@@ -181,6 +221,7 @@ def main() -> int:
     assert_kyverno_policy_contract()
     assert_cratecheck_contract()
     assert_roots_render()
+    assert_namespace_coherence()
     print("kind smoke validation passed")
     return 0
 

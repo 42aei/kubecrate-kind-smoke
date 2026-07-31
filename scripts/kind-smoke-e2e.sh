@@ -73,6 +73,9 @@ cleanup() {
   if test "$CREATED" = 1; then
     if test "$KEEP_CLUSTER" = 1; then
       log "KEEP_CLUSTER=1: retaining cluster $CLUSTER_NAME (context $CONTEXT)"
+      if test $rc -ne 0; then
+        log "WARNING: run failed; retained cluster may be mid-controlled-red, with failing fixtures and red-state objects still present"
+      fi
     else
       kind delete cluster --name "$CLUSTER_NAME" >/dev/null 2>&1 || true
       if kind get clusters | grep -Fx "$CLUSTER_NAME" >/dev/null 2>&1; then

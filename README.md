@@ -21,7 +21,8 @@ Every Flux `Kustomization` under `entrypoint/` uses `sourceRef: GitRepository/ki
 its `dependsOn` entries name the kubecrate-side platform service Kustomizations
 (`external-secrets-operator`, `envoy-gateway`, `cert-manager`, `kyverno`) that the kubecrate
 Vanilla entrypoint reconciles. The smoke layer therefore orders itself after the substrate it
-exercises without owning any part of it.
+exercises without owning any part of it. The suite creates the `kubecrate-system` namespace
+itself; kubecrate's Vanilla composition does not provide it.
 
 Reconciliation order:
 
