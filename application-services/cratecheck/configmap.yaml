@@ -1,0 +1,319 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cratecheck-status-config
+  namespace: cratecheck
+  labels:
+    app.kubernetes.io/name: cratecheck
+    app.kubernetes.io/part-of: kubecrate
+data:
+  status.yaml: |
+    # CrateCheck config contract: https://github.com/42aei/cratecheck/blob/main/docs/kubernetes/README.md#adapting-for-another-service
+    # Evaluate checks on every request so status observations are current.
+    interval: 0
+    checks:
+      - id: cratecheck-deployment-ready
+        name: CrateCheck deployment ready
+        severity: red
+        resource:
+          apiVersion: apps/v1
+          kind: Deployment
+          namespace: cratecheck
+          name: cratecheck
+        expression: >
+          has(object.status) &&
+          object.status.observedGeneration >= object.metadata.generation &&
+          object.status.availableReplicas == object.spec.replicas
+        successMessage: CrateCheck deployment is fully available
+        failureMessage: CrateCheck deployment is not fully available
+      - id: cratecheck-namespace-exists
+        name: CrateCheck namespace exists
+        severity: red
+        resource:
+          apiVersion: v1
+          kind: Namespace
+          namespace: ""
+          name: cratecheck
+        expression: >
+          has(object.metadata) &&
+          object.metadata.name == 'cratecheck'
+        successMessage: cratecheck namespace exists
+        failureMessage: cratecheck namespace not found
+      - id: cratecheck-configmap-present
+        name: CrateCheck check ConfigMap present
+        severity: red
+        resource:
+          apiVersion: v1
+          kind: ConfigMap
+          namespace: cratecheck
+          name: cratecheck-status-config
+        expression: >
+          has(object.data) &&
+          'status.yaml' in object.data &&
+          object.data['status.yaml'] != ''
+        successMessage: check ConfigMap is present and non-empty
+        failureMessage: check ConfigMap is missing or empty
+      - id: eso-helmrelease-ready
+        name: ESO HelmRelease ready
+        severity: red
+        resource:
+          apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          namespace: core-external-secrets-operator
+          name: external-secrets
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: ESO HelmRelease is ready
+        failureMessage: ESO HelmRelease is not ready
+      - id: eso-secretstore-ready
+        name: ESO smoke SecretStore ready
+        severity: red
+        resource:
+          apiVersion: external-secrets.io/v1
+          kind: SecretStore
+          namespace: kubecrate-system
+          name: eso-smoke-kubernetes-store
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c['type'] == 'Ready' && c['status'] == 'True')
+        successMessage: ESO smoke store is ready
+        failureMessage: ESO smoke store is not ready
+      - id: eso-externalsecret-ready
+        name: ESO smoke ExternalSecret ready
+        severity: red
+        resource:
+          apiVersion: external-secrets.io/v1
+          kind: ExternalSecret
+          namespace: kubecrate-system
+          name: eso-smoke-projection
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c['type'] == 'Ready' && c['status'] == 'True')
+        successMessage: ESO smoke projection is synced and ready
+        failureMessage: ESO smoke projection is not ready
+      - id: eso-projected-secret-exists
+        name: ESO projected smoke Secret exists
+        severity: red
+        resource:
+          apiVersion: v1
+          kind: Secret
+          namespace: kubecrate-system
+          name: eso-smoke-projected
+        expression: >-
+          has(object.metadata) &&
+          object.metadata.name == 'eso-smoke-projected'
+        successMessage: ESO projected smoke target exists
+        failureMessage: ESO projected smoke target not found
+      - id: envoy-helmrelease-ready
+        name: Envoy Gateway HelmRelease ready
+        severity: red
+        resource:
+          apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          namespace: core-envoy-gateway
+          name: envoy-gateway
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: Envoy Gateway HelmRelease is ready
+        failureMessage: Envoy Gateway HelmRelease is not ready
+      - id: envoy-gatewayclass-accepted
+        name: Envoy GatewayClass accepted
+        severity: red
+        resource:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: GatewayClass
+          namespace: ""
+          name: kubecrate-envoy-gateway
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Accepted' && c.status == 'True')
+        successMessage: Envoy GatewayClass is accepted
+        failureMessage: Envoy GatewayClass is not accepted
+      - id: envoy-gateway-ready
+        name: Envoy smoke Gateway ready
+        severity: red
+        resource:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: Gateway
+          namespace: core-envoy-gateway
+          name: kubecrate-envoy-smoke
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Programmed' && c.status == 'True')
+        successMessage: Envoy smoke Gateway is programmed
+        failureMessage: Envoy smoke Gateway is not programmed
+      - id: envoy-httproute-ready
+        name: Envoy smoke HTTPRoute accepted
+        severity: red
+        resource:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
+          namespace: cratecheck
+          name: envoy-smoke-cratecheck
+        expression: >-
+          has(object.status) &&
+          has(object.status.parents) &&
+          object.status.parents.exists(p,
+            has(p.parentRef) &&
+            p.parentRef.group == 'gateway.networking.k8s.io' &&
+            p.parentRef.kind == 'Gateway' &&
+            p.parentRef.name == 'kubecrate-envoy-smoke' &&
+            p.parentRef.namespace == 'core-envoy-gateway' &&
+            p.parentRef.sectionName == 'http' &&
+            has(p.controllerName) &&
+            p.controllerName == 'gateway.envoyproxy.io/gatewayclass-controller' &&
+            has(p.conditions) &&
+            p.conditions.exists(c,
+              c.type == 'Accepted' && c.status == 'True') &&
+            p.conditions.exists(c,
+              c.type == 'ResolvedRefs' && c.status == 'True'))
+        successMessage: Envoy smoke HTTPRoute is accepted and resolved
+        failureMessage: Envoy smoke HTTPRoute is not accepted or resolved
+      - id: cert-manager-helmrelease-ready
+        name: cert-manager HelmRelease ready
+        severity: red
+        resource:
+          apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          namespace: core-cert-manager
+          name: cert-manager
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: cert-manager HelmRelease is ready
+        failureMessage: cert-manager HelmRelease is not ready
+      - id: cert-manager-selfsigned-issuer-ready
+        name: cert-manager self-signed ClusterIssuer ready
+        severity: red
+        resource:
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          namespace: ""
+          name: kubecrate-local-selfsigned
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: cert-manager self-signed ClusterIssuer is ready
+        failureMessage: cert-manager self-signed ClusterIssuer is not ready
+      - id: cert-manager-ca-certificate-ready
+        name: cert-manager local CA Certificate ready
+        severity: red
+        resource:
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          namespace: core-cert-manager
+          name: cratecheck-local-ca
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: cert-manager local CA Certificate is ready
+        failureMessage: cert-manager local CA Certificate is not ready
+      - id: cert-manager-ca-issuer-ready
+        name: cert-manager CA ClusterIssuer ready
+        severity: red
+        resource:
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          namespace: ""
+          name: kubecrate-local-ca
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: cert-manager CA ClusterIssuer is ready
+        failureMessage: cert-manager CA ClusterIssuer is not ready
+      - id: cert-manager-tls-certificate-ready
+        name: cert-manager TLS Certificate ready
+        severity: red
+        resource:
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          namespace: cratecheck
+          name: cratecheck-tls
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: cert-manager TLS Certificate is ready
+        failureMessage: cert-manager TLS Certificate is not ready
+      - id: cert-manager-tls-secret-exists
+        name: cert-manager TLS Secret exists
+        severity: red
+        resource:
+          apiVersion: v1
+          kind: Secret
+          namespace: cratecheck
+          name: cratecheck-tls
+        expression: >-
+          has(object.metadata) &&
+          object.metadata.name == 'cratecheck-tls'
+        successMessage: cert-manager TLS Secret exists
+        failureMessage: cert-manager TLS Secret not found
+      - id: kyverno-helmrelease-ready
+        name: Kyverno HelmRelease ready
+        severity: red
+        resource:
+          apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          namespace: core-kyverno
+          name: kyverno
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: Kyverno HelmRelease is ready
+        failureMessage: Kyverno HelmRelease is not ready
+      - id: kyverno-clusterpolicy-ready
+        name: Kyverno require-ns-label ClusterPolicy ready
+        severity: red
+        resource:
+          apiVersion: kyverno.io/v1
+          kind: ClusterPolicy
+          namespace: ""
+          name: require-ns-label
+        expression: >-
+          has(object.status) &&
+          has(object.status.conditions) &&
+          object.status.conditions.exists(c,
+            c.type == 'Ready' && c.status == 'True')
+        successMessage: Kyverno require-ns-label ClusterPolicy is ready
+        failureMessage: Kyverno require-ns-label ClusterPolicy is not ready
+      - id: kyverno-smoke-namespace-exists
+        name: Kyverno allowed smoke namespace exists
+        severity: red
+        resource:
+          apiVersion: v1
+          kind: Namespace
+          namespace: ""
+          name: kyverno-smoke-allowed
+        expression: >-
+          has(object.metadata) &&
+          object.metadata.name == 'kyverno-smoke-allowed' &&
+          has(object.metadata.labels) &&
+          'kubecrate.io/validated' in object.metadata.labels &&
+          object.metadata.labels['kubecrate.io/validated'] == 'true'
+        successMessage: Kyverno admitted the labeled smoke namespace
+        failureMessage: Kyverno allowed smoke namespace is missing or incorrectly labeled

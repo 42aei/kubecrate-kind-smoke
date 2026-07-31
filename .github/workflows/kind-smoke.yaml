@@ -1,0 +1,112 @@
+name: Kind smoke
+
+# Invoked when needed: on demand against a pinned kubecrate substrate ref, or
+# on a weekly cadence to catch drift against the pinned default.
+on:
+  workflow_dispatch:
+    inputs:
+      kubecrate_ref:
+        description: Full 40-character kubecrate commit SHA to smoke against
+        required: true
+        default: 735d0d240c2c45eee86aac77a54c5ac2ceccf73d
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+env:
+  KIND_VERSION: v0.29.0
+  KUBECTL_VERSION: v1.31.4
+  FLUX_VERSION: v2.8.8
+  FLUX_CHART_VERSION: 2.18.4
+  KUSTOMIZE_VERSION: v5.6.0
+  HELM_VERSION: v3.16.4
+  KUBECONFORM_VERSION: v0.6.7
+
+jobs:
+  kind-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out smoke fixtures
+        uses: actions/checkout@v4
+
+      - name: Resolve kubecrate ref
+        run: |
+          set -euo pipefail
+          ref="${{ inputs.kubecrate_ref || '735d0d240c2c45eee86aac77a54c5ac2ceccf73d' }}"
+          if ! grep -Eq '^[0-9a-f]{40}$' <<<"$ref"; then
+            echo "kubecrate ref must be a full 40-character commit SHA: $ref" >&2
+            exit 1
+          fi
+          echo "KUBECRATE_REF=$ref" >>"$GITHUB_ENV"
+
+      - name: Set up kind
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64" -o /tmp/kind
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          kind version
+
+      - name: Set up kubectl
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          kubectl version --client=true
+
+      - name: Set up kustomize
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" -o /tmp/kustomize.tar.gz
+          tar -xzf /tmp/kustomize.tar.gz -C /tmp kustomize
+          sudo install -m 0755 /tmp/kustomize /usr/local/bin/kustomize
+          kustomize version
+
+      - name: Set up pinned Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.16.4
+
+      - name: Set up Flux CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/fluxcd/flux2/releases/download/${FLUX_VERSION}/flux_${FLUX_VERSION#v}_linux_amd64.tar.gz" -o /tmp/flux.tar.gz
+          tar -xzf /tmp/flux.tar.gz -C /tmp flux
+          sudo install -m 0755 /tmp/flux /usr/local/bin/flux
+          flux version --client
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pyyaml
+
+      - name: Run disposable kind smoke
+        env:
+          KUBECRATE_REF: ${{ env.KUBECRATE_REF }}
+          SMOKE_REF: ${{ github.sha }}
+          CLUSTER_NAME: kubecrate-smoke-ci-${{ github.run_id }}
+          FLUX_CHART_VERSION: ${{ env.FLUX_CHART_VERSION }}
+        run: ./scripts/kind-smoke-e2e.sh
+
+      - name: Verify cluster absence
+        if: always()
+        run: |
+          set -euo pipefail
+          if kind get clusters | grep -Fx "kubecrate-smoke-ci-${{ github.run_id }}" >/dev/null; then
+            echo "disposable cluster still present" >&2
+            kind delete cluster --name "kubecrate-smoke-ci-${{ github.run_id }}"
+            exit 1
+          fi
+
+      - name: Upload CrateCheck status artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cratecheck-status-${{ github.run_id }}
+          path: .tmp/kind-smoke-e2e/
+          if-no-files-found: warn
