@@ -57,10 +57,13 @@ make validate
 
 ## Kind smoke flow (CI and local)
 
-`.github/workflows/kind-smoke.yaml` is **invoked when needed** (`workflow_dispatch`, plus a weekly
-schedule). It takes one input: `kubecrate_ref`, the full kubecrate commit SHA to smoke against,
-defaulting to a pinned recent kubecrate `main` commit. Pull requests are covered by the static
-manifest linting workflow only; the kind flow never runs implicitly.
+`.github/workflows/kind-smoke.yaml` is **manual-only** (`workflow_dispatch`). It takes one input:
+`kubecrate_ref`, the full kubecrate commit SHA to smoke against, defaulting to a pinned recent
+kubecrate `main` commit. Pull requests are covered by the static manifest linting workflow only;
+the kind flow never runs implicitly.
+
+Both repositories are public. Flux reads them anonymously over HTTPS, so this design does not
+require a deploy key or Kubernetes Git credential.
 
 The workflow is a thin wrapper around `scripts/kind-smoke-e2e.sh`, which:
 
