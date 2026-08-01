@@ -8,8 +8,6 @@ on:
         description: Full 40-character kubecrate commit SHA to smoke against
         required: true
         default: 735d0d240c2c45eee86aac77a54c5ac2ceccf73d
-  schedule:
-    - cron: '17 3 * * 1'
 
 permissions:
   contents: read
