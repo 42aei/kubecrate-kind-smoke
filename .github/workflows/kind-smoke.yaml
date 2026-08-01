@@ -1,7 +1,6 @@
 name: Kind smoke
 
-# Invoked when needed: on demand against a pinned kubecrate substrate ref, or
-# on a weekly cadence to catch drift against the pinned default.
+# Invoked manually against a pinned kubecrate substrate ref.
 on:
   workflow_dispatch:
     inputs:
