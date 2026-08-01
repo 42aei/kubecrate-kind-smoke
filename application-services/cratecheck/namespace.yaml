@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cratecheck
+  labels:
+    app.kubernetes.io/name: cratecheck
+    app.kubernetes.io/part-of: kubecrate

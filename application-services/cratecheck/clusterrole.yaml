@@ -1,0 +1,82 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cratecheck-readonly
+  labels:
+    app.kubernetes.io/name: cratecheck
+    app.kubernetes.io/part-of: kubecrate
+rules:
+  # CrateCheck uses Kubernetes discovery to map each configured resource apiVersion/kind to the concrete API resource path before issuing read-only get calls.
+  - nonResourceURLs:
+      - /api
+      - /api/*
+      - /apis
+      - /apis/*
+    verbs:
+      - get
+  # Resources checked by the initial baseline check config
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+  # ESO platform service checks: ESO controller, SecretStore, ExternalSecret, projected Secrets
+  - apiGroups:
+      - helm.toolkit.fluxcd.io
+    resources:
+      - helmreleases
+    verbs:
+      - get
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - secretstores
+      - externalsecrets
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+  # Envoy Gateway platform service checks
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - gatewayclasses
+      - gateways
+      - httproutes
+    verbs:
+      - get
+  # cert-manager platform service checks
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - clusterissuers
+      - certificates
+    verbs:
+      - get
+  # Kyverno platform service checks
+  - apiGroups:
+      - kyverno.io
+    resources:
+      - clusterpolicies
+    verbs:
+      - get
+  # Future platform service checks may require additional read verbs on resources
+  # such as secrets, ingresses, certificates, or custom resources.
+  # Expand this ClusterRole incrementally as new checks are added to the check config.

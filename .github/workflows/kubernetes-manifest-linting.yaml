@@ -2,8 +2,22 @@ name: Kubernetes manifest linting
 
 on:
   pull_request:
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'Makefile'
+      - '.github/workflows/kubernetes-manifest-linting.yaml'
   push:
     branches: [main]
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'Makefile'
+      - '.github/workflows/kubernetes-manifest-linting.yaml'
 
 jobs:
   validate:

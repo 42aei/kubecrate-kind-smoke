@@ -2,6 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ./external-secrets-operator-smoke-kustomization.yaml
+  - ./cratecheck-kustomization.yaml
   - ./envoy-gateway-smoke-kustomization.yaml
+  - ./cert-manager-local-issuer-smoke-kustomization.yaml
   - ./kyverno-smoke-policy-kustomization.yaml
   - ./kyverno-smoke-kustomization.yaml

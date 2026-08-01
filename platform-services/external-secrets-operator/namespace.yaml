@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubecrate-system
+  labels:
+    app.kubernetes.io/name: kubecrate-system
+    app.kubernetes.io/part-of: kubecrate
+    kubecrate.io/workload-category: platform-services
+    kubecrate.io/smoke-test: external-secrets-operator
