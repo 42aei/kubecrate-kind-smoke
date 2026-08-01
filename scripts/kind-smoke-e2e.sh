@@ -105,10 +105,12 @@ check_prereqs() {
 
 verify_remote_identity() {
   PHASE="source-identity"
-  git ls-remote "$KUBECRATE_REPO_URL" 2>/dev/null | grep -q "$KUBECRATE_REF" \
-    || fail "kubecrate commit $KUBECRATE_REF is not advertised by $KUBECRATE_REPO_URL"
-  git ls-remote "$SMOKE_REPO_URL" 2>/dev/null | grep -q "$SMOKE_REF" \
-    || fail "smoke commit $SMOKE_REF is not advertised by $SMOKE_REPO_URL; push it first"
+  if ! git ls-remote "$KUBECRATE_REPO_URL" 2>/dev/null | grep "$KUBECRATE_REF" >/dev/null; then
+    fail "kubecrate commit $KUBECRATE_REF is not advertised by $KUBECRATE_REPO_URL"
+  fi
+  if ! git ls-remote "$SMOKE_REPO_URL" 2>/dev/null | grep "$SMOKE_REF" >/dev/null; then
+    fail "smoke commit $SMOKE_REF is not advertised by $SMOKE_REPO_URL; push it first"
+  fi
 }
 
 create_cluster() {
