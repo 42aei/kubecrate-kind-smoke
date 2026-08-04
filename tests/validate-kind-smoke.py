@@ -15,6 +15,7 @@ Static, red-capable checks for the consumer-side smoke suite:
 from pathlib import Path
 import runpy
 import subprocess
+import re
 
 import yaml
 
@@ -68,6 +69,9 @@ KUBECRATE_NAMESPACES = {
     "default",
     "kube-system",
 }
+KUBECRATE_SOURCE_NAME = "flux-system-sync"
+KUBECRATE_TAG = "v0.4.0"
+TAG = re.compile(r"^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 def load(path: Path):
@@ -102,6 +106,19 @@ def assert_entrypoint_contract() -> None:
         assert doc["spec"]["sourceRef"] == {"kind": "GitRepository", "name": "kind-smoke"}, name
         depends_on = [item["name"] for item in doc["spec"].get("dependsOn", [])]
         assert depends_on == DEPENDS_ON[name], (name, depends_on)
+
+
+def assert_kubecrate_source_contract() -> None:
+    script = (ROOT / "scripts/kind-smoke-e2e.sh").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github/workflows/kind-smoke.yaml").read_text(encoding="utf-8")
+    assert f'KUBECRATE_REF="${{KUBECRATE_REF:-{KUBECRATE_TAG}}}"' in script
+    assert f"default: {KUBECRATE_TAG}" in workflow
+    assert TAG.fullmatch(KUBECRATE_TAG)
+    assert f"name: {KUBECRATE_SOURCE_NAME}" in script
+    assert "tag: $KUBECRATE_REF" in script
+    assert "commit: $KUBECRATE_REF" not in script
+    obsolete_source = "kubecrate" + "-upstream"
+    assert obsolete_source not in script
 
 
 def assert_envoy_tls_contract() -> None:
@@ -216,6 +233,7 @@ def assert_namespace_coherence() -> None:
 
 def main() -> int:
     assert_entrypoint_contract()
+    assert_kubecrate_source_contract()
     assert_envoy_tls_contract()
     assert_local_issuer_chain()
     assert_kyverno_policy_contract()

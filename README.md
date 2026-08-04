@@ -15,7 +15,7 @@ Kubecrate's platform services with representative consumers:
 
 The smoke environment uses two Flux `GitRepository` sources:
 
-1. Kubecrate, pinned to the full commit SHA under test and reconciling
+1. Kubecrate, pinned to exact release tag `v0.4.0` as `flux-system-sync` and reconciling
    `compositions/vanilla/entrypoint`.
 2. This repository, pinned to the smoke-suite commit and reconciling `entrypoint/`.
 
@@ -48,8 +48,8 @@ make validate
 
 ## Run locally
 
-The GitHub Actions workflow is manual-only. It accepts `kubecrate_ref`, a full 40-character
-Kubecrate commit SHA. Pull requests run static manifest validation; the kind smoke test never runs
+The GitHub Actions workflow is manual-only. It accepts `kubecrate_ref`, an exact Kubecrate
+release tag. Pull requests run static manifest validation; the kind smoke test never runs
 implicitly.
 
 Run against the default pinned Kubecrate revision:
@@ -58,19 +58,19 @@ Run against the default pinned Kubecrate revision:
 make kind-smoke-ci
 ```
 
-Override either revision when the commit is available remotely:
+Override either revision when it is available remotely:
 
 ```sh
-KUBECRATE_REF=<full-40-character-sha> ./scripts/kind-smoke-e2e.sh
+KUBECRATE_REF=<exact-release-tag> ./scripts/kind-smoke-e2e.sh
 SMOKE_REF=<full-40-character-sha> ./scripts/kind-smoke-e2e.sh
 ```
 
 Prerequisites: `git`, `kind`, `kubectl`, `kustomize`, `helm`, `flux`, `curl`, `python3`, and
-`docker`. Both Flux sources must be able to fetch the requested commits, so push the smoke-suite
+`docker`. Both Flux sources must be able to fetch the requested refs, so push the smoke-suite
 commit before running it.
 
-Kubecrate revisions are always pinned by full commit SHA, never by a moving branch. The default
-Kubecrate SHA is defined in the workflow and smoke script; update both when changing the supported
+Kubecrate revisions are always pinned by exact release tag, never by a moving branch. The default
+Kubecrate tag is defined in the workflow and smoke script; update both when changing the supported
 baseline.
 
 Both repositories are public, so Flux reads them anonymously over HTTPS. No deploy key or
