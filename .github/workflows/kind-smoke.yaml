@@ -1,13 +1,12 @@
 name: Kind smoke
 
-# Invoked manually against a pinned kubecrate substrate ref.
+# Invoked manually against a pinned Kubecrate release tag.
 on:
   workflow_dispatch:
     inputs:
       kubecrate_ref:
-        description: Full 40-character kubecrate commit SHA to smoke against
-        required: true
-        default: 735d0d240c2c45eee86aac77a54c5ac2ceccf73d
+        description: Optional exact Kubecrate release tag; defaults to kubecrate-ref.txt
+        required: false
 
 permissions:
   contents: read
@@ -32,9 +31,12 @@ jobs:
       - name: Resolve kubecrate ref
         run: |
           set -euo pipefail
-          ref="${{ inputs.kubecrate_ref || '735d0d240c2c45eee86aac77a54c5ac2ceccf73d' }}"
-          if ! grep -Eq '^[0-9a-f]{40}$' <<<"$ref"; then
-            echo "kubecrate ref must be a full 40-character commit SHA: $ref" >&2
+          ref="${{ inputs.kubecrate_ref }}"
+          if test -z "$ref"; then
+            ref="$(tr -d '[:space:]' <kubecrate-ref.txt)"
+          fi
+          if ! grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-+][0-9A-Za-z.-]+)?$' <<<"$ref"; then
+            echo "kubecrate ref must be an exact SemVer tag: $ref" >&2
             exit 1
           fi
           echo "KUBECRATE_REF=$ref" >>"$GITHUB_ENV"

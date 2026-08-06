@@ -7,7 +7,7 @@
 #
 #   1. create a unique disposable kind cluster and prove the active context
 #   2. bootstrap Flux from the pinned flux2 Helm chart
-#   3. point a Flux GitRepository at the pinned kubecrate commit and reconcile
+#   3. point a Flux GitRepository at the pinned Kubecrate release tag and reconcile
 #      compositions/vanilla/entrypoint (platform services only)
 #   4. point a second Flux GitRepository (kind-smoke) at this repository at the
 #      selected commit and apply entrypoint/ from the checkout
@@ -24,8 +24,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
 
 KUBECRATE_REPO_URL="${KUBECRATE_REPO_URL:-https://github.com/42aei/kubecrate.git}"
-# Default pin: kubecrate main at the smoke-fixture migration baseline.
-KUBECRATE_REF="${KUBECRATE_REF:-735d0d240c2c45eee86aac77a54c5ac2ceccf73d}"
+KUBECRATE_REF_FILE="${KUBECRATE_REF_FILE:-$ROOT/kubecrate-ref.txt}"
+KUBECRATE_DEFAULT_REF="$(tr -d '[:space:]' <"$KUBECRATE_REF_FILE")"
+KUBECRATE_REF="${KUBECRATE_REF:-$KUBECRATE_DEFAULT_REF}"
 SMOKE_REPO_URL="${SMOKE_REPO_URL:-https://github.com/42aei/kubecrate-kind-smoke.git}"
 SMOKE_REF="${SMOKE_REF:-$(git rev-parse --verify 'HEAD^{commit}')}"
 CLUSTER_NAME="${CLUSTER_NAME:-kubecrate-smoke-$(date +%s)-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6)}"
@@ -94,7 +95,7 @@ check_prereqs() {
   docker info >/dev/null 2>&1 || fail "Docker daemon unavailable"
   [[ "$CLUSTER_NAME" =~ ^kubecrate-smoke[a-z0-9-]*$ ]] && test ${#CLUSTER_NAME} -le 63 \
     || fail "refusing non-smoke cluster identity $CLUSTER_NAME; allowed: kubecrate-smoke[-<lowercase-alphanumeric-segments>]"
-  [[ "$KUBECRATE_REF" =~ ^[0-9a-f]{40}$ ]] || fail "KUBECRATE_REF must be a full 40-character commit SHA"
+  [[ "$KUBECRATE_REF" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-+][0-9A-Za-z.-]+)?$ ]] || fail "KUBECRATE_REF must be an exact SemVer tag"
   [[ "$SMOKE_REF" =~ ^[0-9a-f]{40}$ ]] || fail "SMOKE_REF must be a full 40-character commit SHA"
   if kind get clusters | grep -Fx "$CLUSTER_NAME" >/dev/null 2>&1; then
     fail "cluster $CLUSTER_NAME already exists; refusing to touch a cluster this run did not create"
@@ -105,8 +106,8 @@ check_prereqs() {
 
 verify_remote_identity() {
   PHASE="source-identity"
-  if ! git ls-remote "$KUBECRATE_REPO_URL" 2>/dev/null | grep "$KUBECRATE_REF" >/dev/null; then
-    fail "kubecrate commit $KUBECRATE_REF is not advertised by $KUBECRATE_REPO_URL"
+  if ! git ls-remote --tags --refs "$KUBECRATE_REPO_URL" "refs/tags/$KUBECRATE_REF" 2>/dev/null | grep -F "refs/tags/$KUBECRATE_REF" >/dev/null; then
+    fail "kubecrate tag $KUBECRATE_REF is not advertised by $KUBECRATE_REPO_URL"
   fi
   if ! git ls-remote "$SMOKE_REPO_URL" 2>/dev/null | grep "$SMOKE_REF" >/dev/null; then
     fail "smoke commit $SMOKE_REF is not advertised by $SMOKE_REPO_URL; push it first"
@@ -148,7 +149,7 @@ spec:
   interval: 1m0s
   url: $KUBECRATE_REPO_URL
   ref:
-    commit: $KUBECRATE_REF
+    tag: $KUBECRATE_REF
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

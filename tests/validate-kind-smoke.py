@@ -15,6 +15,7 @@ Static, red-capable checks for the consumer-side smoke suite:
 from pathlib import Path
 import runpy
 import subprocess
+import re
 
 import yaml
 
@@ -68,6 +69,9 @@ KUBECRATE_NAMESPACES = {
     "default",
     "kube-system",
 }
+KUBECRATE_SOURCE_NAME = "flux-system-sync"
+KUBECRATE_REF_FILE = ROOT / "kubecrate-ref.txt"
+TAG = re.compile(r"^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 def load(path: Path):
@@ -102,6 +106,23 @@ def assert_entrypoint_contract() -> None:
         assert doc["spec"]["sourceRef"] == {"kind": "GitRepository", "name": "kind-smoke"}, name
         depends_on = [item["name"] for item in doc["spec"].get("dependsOn", [])]
         assert depends_on == DEPENDS_ON[name], (name, depends_on)
+
+
+def assert_kubecrate_source_contract() -> None:
+    script = (ROOT / "scripts/kind-smoke-e2e.sh").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github/workflows/kind-smoke.yaml").read_text(encoding="utf-8")
+    kubecrate_ref = KUBECRATE_REF_FILE.read_text(encoding="utf-8").strip()
+    assert TAG.fullmatch(kubecrate_ref)
+    assert "KUBECRATE_REF_FILE" in script
+    assert "KUBECRATE_DEFAULT_REF" in script
+    assert 'KUBECRATE_REF="${KUBECRATE_REF:-$KUBECRATE_DEFAULT_REF}"' in script
+    assert f"default: {kubecrate_ref}" not in workflow
+    assert "<kubecrate-ref.txt" in workflow
+    assert f"name: {KUBECRATE_SOURCE_NAME}" in script
+    assert "tag: $KUBECRATE_REF" in script
+    assert "commit: $KUBECRATE_REF" not in script
+    obsolete_source = "kubecrate" + "-upstream"
+    assert obsolete_source not in script
 
 
 def assert_envoy_tls_contract() -> None:
@@ -216,6 +237,7 @@ def assert_namespace_coherence() -> None:
 
 def main() -> int:
     assert_entrypoint_contract()
+    assert_kubecrate_source_contract()
     assert_envoy_tls_contract()
     assert_local_issuer_chain()
     assert_kyverno_policy_contract()
