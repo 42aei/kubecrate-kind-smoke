@@ -70,7 +70,7 @@ KUBECRATE_NAMESPACES = {
     "kube-system",
 }
 KUBECRATE_SOURCE_NAME = "flux-system-sync"
-KUBECRATE_TAG = "v0.4.0"
+KUBECRATE_REF_FILE = ROOT / "kubecrate-ref.txt"
 TAG = re.compile(r"^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$")
 
 
@@ -111,9 +111,13 @@ def assert_entrypoint_contract() -> None:
 def assert_kubecrate_source_contract() -> None:
     script = (ROOT / "scripts/kind-smoke-e2e.sh").read_text(encoding="utf-8")
     workflow = (ROOT / ".github/workflows/kind-smoke.yaml").read_text(encoding="utf-8")
-    assert f'KUBECRATE_REF="${{KUBECRATE_REF:-{KUBECRATE_TAG}}}"' in script
-    assert f"default: {KUBECRATE_TAG}" in workflow
-    assert TAG.fullmatch(KUBECRATE_TAG)
+    kubecrate_ref = KUBECRATE_REF_FILE.read_text(encoding="utf-8").strip()
+    assert TAG.fullmatch(kubecrate_ref)
+    assert "KUBECRATE_REF_FILE" in script
+    assert "KUBECRATE_DEFAULT_REF" in script
+    assert 'KUBECRATE_REF="${KUBECRATE_REF:-$KUBECRATE_DEFAULT_REF}"' in script
+    assert f"default: {kubecrate_ref}" not in workflow
+    assert "<kubecrate-ref.txt" in workflow
     assert f"name: {KUBECRATE_SOURCE_NAME}" in script
     assert "tag: $KUBECRATE_REF" in script
     assert "commit: $KUBECRATE_REF" not in script

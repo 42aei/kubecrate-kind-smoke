@@ -5,9 +5,8 @@ on:
   workflow_dispatch:
     inputs:
       kubecrate_ref:
-        description: Exact Kubecrate release tag to smoke against
-        required: true
-        default: v0.4.0
+        description: Optional exact Kubecrate release tag; defaults to kubecrate-ref.txt
+        required: false
 
 permissions:
   contents: read
@@ -32,7 +31,10 @@ jobs:
       - name: Resolve kubecrate ref
         run: |
           set -euo pipefail
-          ref="${{ inputs.kubecrate_ref || 'v0.4.0' }}"
+          ref="${{ inputs.kubecrate_ref }}"
+          if test -z "$ref"; then
+            ref="$(tr -d '[:space:]' <kubecrate-ref.txt)"
+          fi
           if ! grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-+][0-9A-Za-z.-]+)?$' <<<"$ref"; then
             echo "kubecrate ref must be an exact SemVer tag: $ref" >&2
             exit 1

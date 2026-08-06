@@ -15,7 +15,7 @@ Kubecrate's platform services with representative consumers:
 
 The smoke environment uses two Flux `GitRepository` sources:
 
-1. Kubecrate, pinned to exact release tag `v0.4.0` as `flux-system-sync` and reconciling
+1. Kubecrate, pinned to the exact release tag in `kubecrate-ref.txt` as `flux-system-sync` and reconciling
    `compositions/vanilla/entrypoint`.
 2. This repository, pinned to the smoke-suite commit and reconciling `entrypoint/`.
 
@@ -70,7 +70,7 @@ Prerequisites: `git`, `kind`, `kubectl`, `kustomize`, `helm`, `flux`, `curl`, `p
 commit before running it.
 
 Kubecrate revisions are always pinned by exact release tag, never by a moving branch. The default
-Kubecrate tag is defined in the workflow and smoke script; update both when changing the supported
+Kubecrate tag is defined once in `kubecrate-ref.txt`; update that file when changing the supported
 baseline.
 
 Both repositories are public, so Flux reads them anonymously over HTTPS. No deploy key or

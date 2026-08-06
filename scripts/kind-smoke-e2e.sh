@@ -7,7 +7,7 @@
 #
 #   1. create a unique disposable kind cluster and prove the active context
 #   2. bootstrap Flux from the pinned flux2 Helm chart
-#   3. point a Flux GitRepository at the pinned kubecrate commit and reconcile
+#   3. point a Flux GitRepository at the pinned Kubecrate release tag and reconcile
 #      compositions/vanilla/entrypoint (platform services only)
 #   4. point a second Flux GitRepository (kind-smoke) at this repository at the
 #      selected commit and apply entrypoint/ from the checkout
@@ -24,8 +24,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
 
 KUBECRATE_REPO_URL="${KUBECRATE_REPO_URL:-https://github.com/42aei/kubecrate.git}"
-# Default pin: latest supported Kubecrate release tag.
-KUBECRATE_REF="${KUBECRATE_REF:-v0.4.0}"
+KUBECRATE_REF_FILE="${KUBECRATE_REF_FILE:-$ROOT/kubecrate-ref.txt}"
+KUBECRATE_DEFAULT_REF="$(tr -d '[:space:]' <"$KUBECRATE_REF_FILE")"
+KUBECRATE_REF="${KUBECRATE_REF:-$KUBECRATE_DEFAULT_REF}"
 SMOKE_REPO_URL="${SMOKE_REPO_URL:-https://github.com/42aei/kubecrate-kind-smoke.git}"
 SMOKE_REF="${SMOKE_REF:-$(git rev-parse --verify 'HEAD^{commit}')}"
 CLUSTER_NAME="${CLUSTER_NAME:-kubecrate-smoke-$(date +%s)-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6)}"
